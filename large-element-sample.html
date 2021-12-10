@@ -1,69 +1,73 @@
 <!DOCTYPE html>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
 <html>
-  <head>
-    <style>
-      body {
-        background-color: black;
-        color: white;
-        margin: 0;
-        padding: 0;
-      }
-      .sample {
-        height: 100vh;
-        left: 0;
-        overflow: hidden;
-        position: relative;
-        top: 0;
-        width: 100vw;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="sample" id="color-clouds"></div>
-    <script type='text/javascript' src='main.js'></script>
-    <script type='text/javascript'>
-      function init() {
-        // Log options to console for user convenience/reference
-        console.log('URL query string options:')
-        console.log('option: default')
-        console.log('-------------------------')
-        console.log('bloomDecayMax: 5')
-        console.log('bloomFactor: 3')
-        console.log('bloomInitial: 250')
-        console.log('bloomOdds: 75')
-        console.log('bloomSpreadOdds: 20')
-        console.log('boxSize: 15')
-        console.log('colorDriftFactor: 5')
-        console.log('frameDelay: 100')
 
-        const queryString = window.location.search.substr(1)
-        const queryParamStrings = queryString.split('&')
-        const query = {}
-        queryParamStrings.forEach(str => {
-          const split = str.split('=')
-          if(split.length < 2) return
-          query[split[0]] = split[1]
-        })
-        colorClouds({
-          bloomDecayMax: query.bloomDecayMax || 5,
-          bloomFactor: query.bloomFactor || 3,
-          bloomInitial: query.bloomInitial || 250,
-          bloomOdds: query.bloomOdds || 75,
-          bloomSpreadOdds: query.bloomSpreadOdds || 20,
-          boxSize: query.boxSize || 15,
-          colorDriftFactor: query.colorDriftFactor || 5,
-          elementId: 'color-clouds',
-          frameDelay: query.frameDelay || 100,
-        })
-      }
-      if(document.readyState === 'complete') {
+<head>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+      margin: 0;
+      padding: 0;
+    }
+
+    .sample {
+      height: 100vh;
+      left: 0;
+      overflow: hidden;
+      position: relative;
+      top: 0;
+      width: 100vw;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="sample" id="color-clouds"></div>
+  <script type='text/javascript' src='main.js'></script>
+  <script type='text/javascript'>
+    function init() {
+      // Log options to console for user convenience/reference
+      console.log('URL query string options:')
+      console.log('option: default')
+      console.log('-------------------------')
+      console.log('bloomDecayMax: 5')
+      console.log('bloomFactor: 3')
+      console.log('bloomInitial: 250')
+      console.log('bloomOdds: 75')
+      console.log('bloomSpreadOdds: 20')
+      console.log('boxSize: 15')
+      console.log('colorDriftFactor: 5')
+      console.log('frameDelay: 100')
+
+      const queryString = window.location.search.substr(1)
+      const queryParamStrings = queryString.split('&')
+      const query = {}
+      queryParamStrings.forEach(str => {
+        const split = str.split('=')
+        if (split.length < 2) return
+        query[split[0]] = split[1]
+      })
+      colorClouds({
+        bloomDecayMax: query.bloomDecayMax || 5,
+        bloomFactor: query.bloomFactor || 3,
+        bloomInitial: query.bloomInitial || 250,
+        bloomOdds: query.bloomOdds || 75,
+        bloomSpreadOdds: query.bloomSpreadOdds || 20,
+        boxSize: query.boxSize || 15,
+        colorDriftFactor: query.colorDriftFactor || 5,
+        elementId: 'color-clouds',
+        frameDelay: query.frameDelay || 100,
+      })
+    }
+    if (document.readyState === 'complete') {
+      init()
+    } else {
+      window.addEventListener('load', () => {
         init()
-      } else {
-        window.addEventListener('load', () => {
-          init()
-        })
-      }
-    </script>
-  </body>
+      })
+    }
+  </script>
+</body>
+
 </html>

@@ -16,12 +16,15 @@ const coinToss = () => {
   return randInt(0, 1) ? true : false
 }
 
-function Box(red, green, blue, bloom, spanId) {
+const spansByIndex = [];
+
+function Box(red, green, blue, bloom, spanId, spanName) {
   this.red = red
   this.green = green
   this.blue = blue
   this.bloom = bloom
   this.spanId = spanId
+  this.spanName = spanName
   this.originColor = null
 }
 
@@ -32,7 +35,7 @@ const initBoxes = (boxSize, displayElement, boxData, boxDataStage) => {
 
   const height = Math.ceil(displayHeight / boxSize)
   const width = Math.ceil(displayWidth / boxSize)
-
+  let spanId = 0;
   for (let row = 0; row < height; row++) {
     boxData.push([])
     boxDataStage.push([])
@@ -42,18 +45,21 @@ const initBoxes = (boxSize, displayElement, boxData, boxDataStage) => {
       const green = 0
       const blue = 0
       const bloom = 0
-      const spanId = `box-${displayElement.id}-${row}-${col}`
+      const spanName = `box-${displayElement.id}-${row}-${col}`
       boxData[row].push(new Box(red, green, blue, bloom, spanId))
       boxDataStage[row].push(new Box(red, green, blue, bloom, spanId))
 
-      span.id = spanId
+      span.id = spanId;
       span.style.backgroundColor = `rgb(${red}, ${green}, ${blue})`
       span.style.height = `${boxSize}px`
       span.style.left = `${col * boxSize}px`
       span.style.position = 'absolute'
       span.style.top = `${row * boxSize}px`
       span.style.width = `${boxSize}px`
-      displayElement.appendChild(span)
+      span.style.contain = "strict"
+      displayElement.appendChild(span);
+      spansByIndex.push(span);
+      spanId++;
     }
   }
 }
@@ -111,42 +117,42 @@ const startLoop = (bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpr
         blue: boxDataStage[y][x].blue,
       }
     }
-    
+
     // step: apply bloom/averaging rules
     boxDataStage.forEach((row, r) => {
       row.forEach((box, c) => {
         // If current has bloom, avg w self's origin and other higher bloom neightbors and reduce bloom
         if (box.bloom > 0) {
-          if (DEBUG) document.getElementById(box.spanId).innerHTML = 'B'
+          if (DEBUG) spansByIndex[box.spanId].innerHTML = 'B'
           const avg = {
             red: box.originColor.red,
             green: box.originColor.green,
             blue: box.originColor.blue,
             count: 1
           }
-          if (c > 0 && boxData[r][c-1].bloom >= box.bloom) {
-            const other = boxData[r][c-1]
+          if (c > 0 && boxData[r][c - 1].bloom >= box.bloom) {
+            const other = boxData[r][c - 1]
             avg.red += other.red
             avg.green += other.green
             avg.blue += other.blue
             avg.count++
           }
-          if (c < row.length - 1 && boxData[r][c+1].bloom >= box.bloom) {
-            const other = boxData[r][c+1]
+          if (c < row.length - 1 && boxData[r][c + 1].bloom >= box.bloom) {
+            const other = boxData[r][c + 1]
             avg.red += other.red
             avg.green += other.green
             avg.blue += other.blue
             avg.count++
           }
-          if (r > 0 && boxData[r-1][c].bloom >= box.bloom) {
-            const other = boxData[r-1][c]
+          if (r > 0 && boxData[r - 1][c].bloom >= box.bloom) {
+            const other = boxData[r - 1][c]
             avg.red += other.red
             avg.green += other.green
             avg.blue += other.blue
             avg.count++
           }
-          if (r < boxDataStage.length - 1 && boxData[r+1][c].bloom >= box.bloom) {
-            const other = boxData[r+1][c]
+          if (r < boxDataStage.length - 1 && boxData[r + 1][c].bloom >= box.bloom) {
+            const other = boxData[r + 1][c]
             avg.red += other.red
             avg.green += other.green
             avg.blue += other.blue
@@ -162,7 +168,7 @@ const startLoop = (bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpr
         }
         // If box lacks bloom, avg w all neighbors; weight bloom neighbors; maybe catch their bloom
         else if (box.bloom < 1) {
-          if (DEBUG) document.getElementById(box.spanId).innerHTML = ''
+          if (DEBUG) spansByIndex[box.spanId].innerHTML = ''
           const avg = {
             red: box.red,
             green: box.green,
@@ -172,7 +178,7 @@ const startLoop = (bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpr
           let maxNeighborBloom = 0
           let newOrigin = null
           if (c > 0) {
-            const other = boxData[r][c-1]
+            const other = boxData[r][c - 1]
             avg.red += other.red * (other.bloom > 0 ? bloomFactor : 1)
             avg.green += other.green * (other.bloom > 0 ? bloomFactor : 1)
             avg.blue += other.blue * (other.bloom > 0 ? bloomFactor : 1)
@@ -183,7 +189,7 @@ const startLoop = (bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpr
             }
           }
           if (c < row.length - 1) {
-            const other = boxData[r][c+1]
+            const other = boxData[r][c + 1]
             avg.red += other.red * (other.bloom > 0 ? bloomFactor : 1)
             avg.green += other.green * (other.bloom > 0 ? bloomFactor : 1)
             avg.blue += other.blue * (other.bloom > 0 ? bloomFactor : 1)
@@ -194,7 +200,7 @@ const startLoop = (bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpr
             }
           }
           if (r > 0) {
-            const other = boxData[r-1][c]
+            const other = boxData[r - 1][c]
             avg.red += other.red * (other.bloom > 0 ? bloomFactor : 1)
             avg.green += other.green * (other.bloom > 0 ? bloomFactor : 1)
             avg.blue += other.blue * (other.bloom > 0 ? bloomFactor : 1)
@@ -205,7 +211,7 @@ const startLoop = (bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpr
             }
           }
           if (r < boxDataStage.length - 1) {
-            const other = boxData[r+1][c]
+            const other = boxData[r + 1][c]
             avg.red += other.red * (other.bloom > 0 ? bloomFactor : 1)
             avg.green += other.green * (other.bloom > 0 ? bloomFactor : 1)
             avg.blue += other.blue * (other.bloom > 0 ? bloomFactor : 1)
@@ -225,7 +231,7 @@ const startLoop = (bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpr
         }
       })
     })
-    
+
     // step: apply drift
     boxDataStage.forEach(row => {
       row.forEach(box => {
@@ -241,18 +247,40 @@ const startLoop = (bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpr
     })
 
     // step: write fussed stage to DOM and boxData
+    let buff = [];
     boxDataStage.forEach((row, r) => {
       row.forEach((currentBox, c) => {
-        document.getElementById(currentBox.spanId).style.backgroundColor =
-          `rgb(${currentBox.red}, ${currentBox.green}, ${currentBox.blue})`
+        // const x = boxToHex(currentBox);
+        // const y = `rgb(${currentBox.red}, ${currentBox.green}, ${currentBox.blue})`;
+        // spansByIndex[currentBox.spanId].style.backgroundColor =
+        //   `rgb(${currentBox.red}, ${currentBox.green}, ${currentBox.blue})`
+        //spansByIndex[currentBox.spanId].style.backgroundColor = boxToHex(currentBox)
+        buff.push([spansByIndex[currentBox.spanId], boxToHex(currentBox)]);
         boxData[r][c].red = currentBox.red
         boxData[r][c].green = currentBox.green
         boxData[r][c].blue = currentBox.blue
         boxData[r][c].bloom = currentBox.bloom
         boxData[r][c].originColor = currentBox.originColor
-        })
+      })
     })
+
+    for (let i = 0; i < buff.length; i++) {
+      const item = buff[i];
+      item[0].style.backgroundColor = item[1];
+    }
+    buff[0] = buff[0][0].style.backgroundColor; // does this do anything helpful by triggering the reflow here?
   }, frameDelay)
+}
+
+const boxToHex = (cb) => {
+  return "#" + hexPad(cb.red) + hexPad(cb.green) + hexPad(cb.blue);
+}
+
+function hexPad(x) {
+  let hex = Math.floor(x).toString(16);
+  if (hex.length < 2)
+    hex = "0" + hex;
+  return hex;
 }
 
 // returns ref to its interval for cancelation in case of a new loop start
