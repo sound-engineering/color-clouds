@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<html>
+
+<head>
+  <style>
+    @import url("https://use.typekit.net/jpq0lpr.css");
+
+    body {
+      background-color: black;
+      color: white;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .sample {
+      height: 100vh;
+      left: 0;
+      position: relative;
+      top: 0;
+      width: 100vw;
+      filter: blur(10px);
+    }
+
+    #title {
+      position: absolute;
+      box-sizing: border-box;
+      height: 50%;
+      width: 100%;
+      left: 0;
+      top: 40%;
+      text-align: center;
+      font-size: 40vmin;
+      vertical-align: baseline;
+      font-family: "cinder", sans-serif;
+      color: white;
+      letter-spacing: 4vmin;
+      opacity: 0.7;
+      -ms-transform: translateY(-50%);
+      transform: translateY(-50%);
+    }
+
+    #title-text {
+      filter: blur(0.8vmin);
+      text-shadow: -0.5vw -0.5vw 0 #000, 0.5vw -0.5vw 0 #000, -0.5vw 0.5vw 0 #000, 0.5vw 0.5vw 0 #000;
+
+    }
+
+    #subtitle {
+      display: block !important;
+      clear: both;
+      font-size: 20%;
+      padding-top: 0px;
+      margin-top: 0px;
+      line-height: 0px;
+      letter-spacing: 1.5vw;
+      filter: blur(0.4vmin);
+      text-shadow: -0.2vw -0.2vw 0 #000, 0.2vw -0.2vw 0 #000, -0.2vw 0.2vw 0 #000, 0.2vw 0.2vw 0 #000;
+
+    }
+
+    #credit {
+      position: fixed;
+      bottom: 5px;
+      right: 10px;
+      text-align: right;
+      font-family: "gill-sans-nova", sans-serif;
+      color: white;
+      opacity: 0.7;
+      filter: blur(0.1vmin);
+      font-size: 2vmin;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="sample" id="color-clouds">
+  </div>
+  <div id="title"><span id="title-text">HEAT</span>
+    <div id="subtitle">cooking 2022</div>
+  </div>
+  <div id="credit">Charlie Heat & Sound Engineering LLC</div>
+  <script type='text/javascript' src='main.js'></script>
+  <script type='text/javascript'>
+    function init() {
+      // Log options to console for user convenience/reference
+      console.log('URL query string options:')
+      console.log('option: default')
+      console.log('-------------------------')
+      console.log('bloomDecayMax: 5')
+      console.log('bloomFactor: 3')
+      console.log('bloomInitial: 250')
+      console.log('bloomOdds: 75')
+      console.log('bloomSpreadOdds: 20')
+      console.log('boxSize: 15')
+      console.log('colorDriftFactor: 5')
+      console.log('frameDelay: 100')
+
+      const queryString = window.location.search.substr(1)
+      const queryParamStrings = queryString.split('&')
+      const query = {}
+      queryParamStrings.forEach(str => {
+        const split = str.split('=')
+        if (split.length < 2) return
+        query[split[0]] = split[1]
+      })
+
+      colorClouds({
+        bloomDecayMax: query.bloomDecayMax || 5,
+        bloomFactor: query.bloomFactor || 3,
+        bloomInitial: query.bloomInitial || 250,
+        bloomOdds: query.bloomOdds || 75,
+        bloomSpreadOdds: query.bloomSpreadOdds || 20,
+        boxSize: query.boxSize || 30,
+        colorDriftFactor: query.colorDriftFactor || 10,
+        elementId: 'color-clouds',
+        frameDelay: query.frameDelay || 80,
+        startingBlooms: 4,
+        colors: [
+          [208, 107, 23],
+          [188, 66, 2],
+          [250, 228, 117],
+          [213, 84, 8],
+          [201, 110, 11],
+          [149, 40, 7],
+          [178, 64, 2],
+          [252, 159, 27],
+          [233, 152, 51],
+          [85, 40, 6]]
+      })
+    }
+
+    if (document.readyState === 'complete') {
+      init()
+    } else {
+      window.addEventListener('load', () => {
+        init()
+      })
+    }
+  </script>
+</body>
+
+</html>
