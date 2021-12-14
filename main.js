@@ -1,3 +1,13 @@
+/*
+
+Color clouds (c) 2021 Steven Kitzes
+with controbutions by Sound Engineering LLC
+
+license TBD but probably gonna be MIT or Do the Fuck What You Want license
+use at your own risk, no promises
+
+*/
+
 let DEBUG = true
 
 const log = (msg) => {
@@ -19,6 +29,11 @@ const coinToss = () => {
 
 function limit(x, lo, hi) {
     return x < lo ? lo : x > hi ? hi : x;
+}
+
+function randomChoice(choices) {
+    var index = Math.floor(Math.random() * choices.length);
+    return choices[index];
 }
 
 class Box {
@@ -64,11 +79,12 @@ class Box {
     }
 
     startBloom(initialBloom) {
-        this.red = randInt(0, 255);
-        this.green = randInt(0, 255);
-        this.blue = randInt(0, 255);
+        const [red, green, blue] = this.grid.getColor();
+        this.red = red;
+        this.green = green;
+        this.blue = blue;
         this.bloom = initialBloom;
-        this.setOriginColor(this.red, this.green, this.blue);
+        this.setOriginColor(red, green, blue);
     }
 
     setOriginColor(r, g, b) {
@@ -153,6 +169,10 @@ class BoxGrid {
             this.stage.push(stageRow);
             this.data.push(dataRow);
         }
+
+        for (let i = 0; i < this.options.startingBlooms; i++) {
+            this.getRandomStagedBox().startBloom(this.options.bloomInitial);
+        }
     }
 
     getNumRows() {
@@ -201,6 +221,18 @@ class BoxGrid {
         }
 
         this.element.style.filter = `blur(${blur}px)`;
+    }
+
+    getColor() {
+        if (!this.options.colors) {
+            return [
+                randInt(0, 255),
+                randInt(0, 255),
+                randInt(0, 255)
+            ]
+        } else {
+            return randomChoice(this.options.colors);
+        }
     }
 
     *iterateData() {
@@ -340,6 +372,8 @@ const colorClouds = (args = {}) => {
     const frameDelay = args.frameDelay || 100
     const blur = args.blur || 10;
     const blurBlinkOdds = args.blurBlinkOdds || 90
+    const colors = args.colors || undefined
+    const startingBlooms = args.startingBlooms || 0
     DEBUG = args.debug || false
 
     const displayElement = document.getElementById(elementId)
@@ -362,7 +396,9 @@ const colorClouds = (args = {}) => {
         bloomSpreadOdds,
         colorDriftFactor,
         blur,
-        blurBlinkOdds
+        blurBlinkOdds,
+        colors,
+        startingBlooms
     });
 
 
