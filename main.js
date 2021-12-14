@@ -1,293 +1,371 @@
 let DEBUG = true
 
 const log = (msg) => {
-  if (DEBUG) console.log(msg)
+    if (DEBUG) console.log(msg)
 }
 const error = (msg) => {
-  console.log(`ERROR: ${msg}`)
+    console.log(`ERROR: ${msg}`)
 }
 
 // start and end both inclusive
 const randInt = (start, end) => {
-  const span = end - start + 1
-  return Math.floor(Math.random() * span) + start
+    const span = end - start + 1
+    return Math.floor(Math.random() * span) + start
 }
+
 const coinToss = () => {
-  return randInt(0, 1) ? true : false
+    return randInt(0, 1) ? true : false
 }
 
-function Box(red, green, blue, bloom, spanId) {
-  this.red = red
-  this.green = green
-  this.blue = blue
-  this.bloom = bloom
-  this.spanId = spanId
-  this.originColor = null
+function limit(x, lo, hi) {
+    return x < lo ? lo : x > hi ? hi : x;
 }
 
-// set up DOM with boxes
-const initBoxes = (boxSize, displayElement, boxData, boxDataStage) => {
-  const displayWidth = displayElement.clientWidth
-  const displayHeight = displayElement.clientHeight
-
-  const height = Math.ceil(displayHeight / boxSize)
-  const width = Math.ceil(displayWidth / boxSize)
-
-  for (let row = 0; row < height; row++) {
-    boxData.push([])
-    boxDataStage.push([])
-    for (let col = 0; col < width; col++) {
-      const span = document.createElement('span')
-      const red = 0
-      const green = 0
-      const blue = 0
-      const bloom = 0
-      const spanId = `box-${displayElement.id}-${row}-${col}`
-      boxData[row].push(new Box(red, green, blue, bloom, spanId))
-      boxDataStage[row].push(new Box(red, green, blue, bloom, spanId))
-
-      span.id = spanId
-      span.style.backgroundColor = `rgb(${red}, ${green}, ${blue})`
-      span.style.height = `${boxSize}px`
-      span.style.left = `${col * boxSize}px`
-      span.style.position = 'absolute'
-      span.style.top = `${row * boxSize}px`
-      span.style.width = `${boxSize}px`
-      displayElement.appendChild(span)
+class Box {
+    constructor(grid, stage, row, col, span) {
+        this.grid = grid
+        this.isStage = stage
+        this.red = 0
+        this.green = 0
+        this.blue = 0
+        this.bloom = 0
+        this.span = span
+        this.row = row
+        this.col = col
+        this.originColor = null
     }
-  }
+
+    static colorDrift(factor) {
+        return randInt(-factor, factor);
+    }
+
+    boundColors() {
+        this.red = limit(this.red, 0, 255);
+        this.green = limit(this.green, 0, 255);
+        this.blue = limit(this.blue, 0, 255);
+    }
+
+    driftColors(factor) {
+        factor = factor || this.grid.options.colorDriftFactor;
+        this.red += Box.colorDrift(factor);
+        this.green += Box.colorDrift(factor);
+        this.blue += Box.colorDrift(factor);
+    }
+
+    clonePropertiesFrom(otherBox, colorsOnly) {
+        this.red = otherBox.red;
+        this.green = otherBox.green;
+        this.blue = otherBox.blue;
+
+        if (!colorsOnly) {
+            this.bloom = otherBox.bloom;
+            this.originColor = otherBox.originColor;
+        }
+    }
+
+    startBloom(initialBloom) {
+        this.red = randInt(0, 255);
+        this.green = randInt(0, 255);
+        this.blue = randInt(0, 255);
+        this.bloom = initialBloom;
+        this.setOriginColor(this.red, this.green, this.blue);
+    }
+
+    setOriginColor(r, g, b) {
+        this.originColor = {
+            red: r,
+            green: g,
+            blue: b
+        }
+    }
+
+    getBloomFactor() {
+        return this.bloom > 0 ? this.grid.options.bloomFactor : 1;
+    }
+
+    updateSpanColor() {
+        let color = "rgb(" + this.red + "," + this.green + "," + this.blue + ")";
+        this.span.style.backgroundColor = color;
+    }
+
+    getStore(staged) {
+        return staged ? this.grid.stage : this.grid.data;
+    }
+
+    getAbove(staged) {
+        return this.row > 0 ? this.getStore(staged)[this.row - 1][this.col] : null;
+    }
+
+    getBelow(staged) {
+        return this.row < this.grid.getNumRows() - 1 ? this.getStore(staged)[this.row + 1][this.col] : null;
+    }
+
+    getLeft(staged) {
+        return this.col > 0 ? this.getStore(staged)[this.row][this.col - 1] : null;
+    }
+
+    getRight(staged) {
+        return this.col < this.grid.getNumCols() - 1 ? this.getStore(staged)[this.row][this.col + 1] : null;
+    }
+
+    getNeighbors(staged) {
+        return [this.getAbove(staged), this.getBelow(staged), this.getLeft(staged), this.getRight(staged)];
+    }
+
 }
 
-const enforceColorBoundsOnBox = (box) => {
-  if (box.red < 0) box.red = 0
-  if (box.green < 0) box.green = 0
-  if (box.blue < 0) box.blue = 0
-  if (box.red > 255) box.red = 255
-  if (box.green > 255) box.green = 255
-  if (box.blue > 255) box.blue = 255
+
+class BoxGrid {
+    constructor(element, boxSize, options) {
+        this.element = element;
+        this.stage = [];
+        this.data = [];
+        this.options = options;
+
+        this.layout(boxSize);
+    }
+
+    layout(boxSize) {
+        const height = Math.ceil(this.element.clientHeight / boxSize)
+        const width = Math.ceil(this.element.clientWidth / boxSize)
+        this.element.innerHTML = ""
+
+        for (let row = 0; row < height; row++) {
+            const stageRow = [];
+            const dataRow = [];
+
+            for (let col = 0; col < width; col++) {
+                const span = document.createElement('span')
+
+                span.style.backgroundColor = "#000"
+                span.style.height = `${boxSize}px`
+                span.style.left = `${col * boxSize}px`
+                span.style.position = 'absolute'
+                span.style.top = `${row * boxSize}px`
+                span.style.width = `${boxSize}px`
+                span.style.borderRadius = boxSize / 2 + "px"
+                this.element.appendChild(span)
+
+                dataRow.push(new Box(this, false, row, col, span))
+                stageRow.push(new Box(this, true, row, col, span))
+            }
+
+            this.stage.push(stageRow);
+            this.data.push(dataRow);
+        }
+    }
+
+    getNumRows() {
+        return this.data.length;
+    }
+
+    getNumCols() {
+        if (this.data[0] !== undefined) {
+            return this.data[0].length;
+        }
+        return 0;
+    }
+
+    getRandomStagedBox() {
+        const r = randInt(0, this.getNumRows() - 1);
+        const c = randInt(0, this.getNumCols() - 1);
+        return this.stage[r][c];
+    }
+
+    randomlyBloom() {
+        if (randInt(0, this.options.bloomOdds) === 0) {
+            this.getRandomStagedBox().startBloom(this.options.bloomInitial);
+        }
+    }
+
+    randomlySpread(box, maxNeighborBloom, newOriginColor) {
+        if (randInt(0, this.options.bloomSpreadOdds) === 0) {
+            box.bloom = Math.max(maxNeighborBloom - randInt(1, this.options.bloomDecayMax), 0);
+            if (box.bloom > 0) {
+                box.originColor = newOriginColor;
+            }
+        }
+    }
+
+    randomlyBlur() {
+        // blur blinks
+        const r = Math.random();
+        const thresh = 1 / this.options.blurBlinkOdds;
+        let blur = this.options.blur;
+        const blurIncrement = blur * .2;
+
+        if (r <= thresh * 0.5) {
+            blur += blurIncrement * 2;
+        } else if (r <= thresh) {
+            blur += blurIncrement
+        }
+
+        this.element.style.filter = `blur(${blur}px)`;
+    }
+
+    *iterateData() {
+        for (let r = 0; r < this.getNumRows(); r++) {
+            for (let c = 0; c < this.getNumCols(); c++) {
+                yield { box: this.data[r][c], staged: this.stage[r][c] };
+            }
+        }
+    }
+
 }
 
-const colorDrift = (factor) => {
-  return randInt(-factor, factor)
+class ColorAverager {
+    constructor(obj) {
+        this.red = obj.red;
+        this.green = obj.green;
+        this.blue = obj.blue;
+        this.count = 1;
+    }
+
+    addFromObj(obj, count) {
+        this.red += obj.red * count;
+        this.green += obj.green * count;
+        this.blue += obj.blue * count;
+        this.count += count;
+    }
+
+    applyRGB(obj) {
+        obj.red = this.red / this.count;
+        obj.green = this.green / this.count;
+        obj.blue = this.blue / this.count;
+    }
 }
 
 // returns ref to its interval to be canceled if a new loop is started
-const startLoop = (bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpreadOdds, boxData, boxDataStage, colorDriftFactor, frameDelay) => {
-  return setInterval(() => {
-    // general strategy: READ from boxData to WRITE to boxDatastage
-    // fuss around and customize values in boxDataStage, maintaining frame-wise original,
-    // pristine state in boxData; when done, write colors from boxDateStage to DOM, as well
-    // as back to boxData
+const startLoop = (frameDelay, grid) => {
 
-    // for each box:
-    // if i have bloom:
-    //   average me with self and other bloom neighbors ONLY for those neighbors with higher bloom count than mine
-    //   reduce my remaining bloom count
-    // if i don't have bloom:
-    //   average me with all neighbors
-    //   weight the average toward boxes with bloom
-    //   chance of catching some amount of bloom and becoming a bloom box
+    return setInterval(() => {
+        // general strategy: READ from boxData to WRITE to boxDatastage
+        // fuss around and customize values in boxDataStage, maintaining frame-wise original,
+        // pristine state in boxData; when done, write colors from boxDateStage to DOM, as well
+        // as back to boxData
 
-    // step: populate stage data from boxData
-    boxData.forEach((row, r) => {
-      row.forEach((currentBox, c) => {
-        boxDataStage[r][c].red = currentBox.red
-        boxDataStage[r][c].green = currentBox.green
-        boxDataStage[r][c].blue = currentBox.blue
-      })
-    })
+        // for each box:
+        // if i have bloom:
+        //   average me with self and other bloom neighbors ONLY for those neighbors with higher bloom count than mine
+        //   reduce my remaining bloom count
+        // if i don't have bloom:
+        //   average me with all neighbors
+        //   weight the average toward boxes with bloom
+        //   chance of catching some amount of bloom and becoming a bloom box
 
-    // step: seed new blooms
-    if (randInt(0, bloomOdds) === 0) {
-      const x = randInt(0, boxDataStage[0].length - 1)
-      const y = randInt(0, boxDataStage.length - 1)
-      boxDataStage[y][x].red = randInt(0, 255)
-      boxDataStage[y][x].green = randInt(0, 255)
-      boxDataStage[y][x].blue = randInt(0, 255)
-      boxDataStage[y][x].bloom = bloomInitial
-      boxDataStage[y][x].originColor = {
-        red: boxDataStage[y][x].red,
-        green: boxDataStage[y][x].green,
-        blue: boxDataStage[y][x].blue,
-      }
-    }
-    
-    // step: apply bloom/averaging rules
-    boxDataStage.forEach((row, r) => {
-      row.forEach((box, c) => {
-        // If current has bloom, avg w self's origin and other higher bloom neightbors and reduce bloom
-        if (box.bloom > 0) {
-          if (DEBUG) document.getElementById(box.spanId).innerHTML = 'B'
-          const avg = {
-            red: box.originColor.red,
-            green: box.originColor.green,
-            blue: box.originColor.blue,
-            count: 1
-          }
-          if (c > 0 && boxData[r][c-1].bloom >= box.bloom) {
-            const other = boxData[r][c-1]
-            avg.red += other.red
-            avg.green += other.green
-            avg.blue += other.blue
-            avg.count++
-          }
-          if (c < row.length - 1 && boxData[r][c+1].bloom >= box.bloom) {
-            const other = boxData[r][c+1]
-            avg.red += other.red
-            avg.green += other.green
-            avg.blue += other.blue
-            avg.count++
-          }
-          if (r > 0 && boxData[r-1][c].bloom >= box.bloom) {
-            const other = boxData[r-1][c]
-            avg.red += other.red
-            avg.green += other.green
-            avg.blue += other.blue
-            avg.count++
-          }
-          if (r < boxDataStage.length - 1 && boxData[r+1][c].bloom >= box.bloom) {
-            const other = boxData[r+1][c]
-            avg.red += other.red
-            avg.green += other.green
-            avg.blue += other.blue
-            avg.count++
-          }
-          box.red = avg.red / avg.count
-          box.green = avg.green / avg.count
-          box.blue = avg.blue / avg.count
-          box.bloom--
-          if (box.bloom < 1) {
-            box.originColor = null
-          }
+        // step: populate stage data from boxData
+        for (const { box, staged } of grid.iterateData()) {
+            staged.clonePropertiesFrom(box, true);
         }
-        // If box lacks bloom, avg w all neighbors; weight bloom neighbors; maybe catch their bloom
-        else if (box.bloom < 1) {
-          if (DEBUG) document.getElementById(box.spanId).innerHTML = ''
-          const avg = {
-            red: box.red,
-            green: box.green,
-            blue: box.blue,
-            count: 1
-          }
-          let maxNeighborBloom = 0
-          let newOrigin = null
-          if (c > 0) {
-            const other = boxData[r][c-1]
-            avg.red += other.red * (other.bloom > 0 ? bloomFactor : 1)
-            avg.green += other.green * (other.bloom > 0 ? bloomFactor : 1)
-            avg.blue += other.blue * (other.bloom > 0 ? bloomFactor : 1)
-            avg.count += (other.bloom > 0 ? bloomFactor : 1)
-            if (other.bloom - bloomDecayMax > maxNeighborBloom) {
-              maxNeighborBloom = other.bloom
-              newOrigin = other.originColor
+
+        // step: seed new blooms
+        grid.randomlyBloom();
+
+        // step: apply bloom/averaging rules
+        for (const { staged } of grid.iterateData()) {
+
+            // If current has bloom, avg w self's origin and other higher bloom neightbors and reduce bloom
+            if (staged.bloom > 0) {
+                if (DEBUG) staged.span.innerHTML = 'B'
+
+                const avg = new ColorAverager(staged.originColor);
+
+                for (const neighbor of staged.getNeighbors(false)) {
+                    if (neighbor && neighbor.bloom >= staged.bloom) {
+                        avg.addFromObj(neighbor, 1);
+                    }
+                }
+
+                avg.applyRGB(staged);
+
+                staged.bloom--;
+                if (staged.bloom < 1) {
+                    staged.originColor = null
+                }
             }
-          }
-          if (c < row.length - 1) {
-            const other = boxData[r][c+1]
-            avg.red += other.red * (other.bloom > 0 ? bloomFactor : 1)
-            avg.green += other.green * (other.bloom > 0 ? bloomFactor : 1)
-            avg.blue += other.blue * (other.bloom > 0 ? bloomFactor : 1)
-            avg.count += (other.bloom > 0 ? bloomFactor : 1)
-            if (other.bloom - bloomDecayMax > maxNeighborBloom) {
-              maxNeighborBloom = other.bloom
-              newOrigin = other.originColor
+
+            // If box lacks bloom, avg w all neighbors; weight bloom neighbors; maybe catch their bloom
+            else if (staged.bloom < 1) {
+                if (DEBUG) staged.span.innerHTML = ''
+
+                const avg = new ColorAverager(staged);
+                let maxNeighborBloom = 0
+                let newOrigin = null
+
+                for (const neighbor of staged.getNeighbors(false)) {
+                    if (neighbor) {
+                        avg.addFromObj(neighbor, neighbor.getBloomFactor());
+
+                        if (neighbor.bloom - grid.options.bloomDecayMax > maxNeighborBloom) {
+                            maxNeighborBloom = neighbor.bloom
+                            newOrigin = neighbor.originColor
+                        }
+                    }
+                }
+
+                avg.applyRGB(staged);
+
+                grid.randomlySpread(staged, maxNeighborBloom, newOrigin);
             }
-          }
-          if (r > 0) {
-            const other = boxData[r-1][c]
-            avg.red += other.red * (other.bloom > 0 ? bloomFactor : 1)
-            avg.green += other.green * (other.bloom > 0 ? bloomFactor : 1)
-            avg.blue += other.blue * (other.bloom > 0 ? bloomFactor : 1)
-            avg.count += (other.bloom > 0 ? bloomFactor : 1)
-            if (other.bloom - bloomDecayMax > maxNeighborBloom) {
-              maxNeighborBloom = other.bloom
-              newOrigin = other.originColor
-            }
-          }
-          if (r < boxDataStage.length - 1) {
-            const other = boxData[r+1][c]
-            avg.red += other.red * (other.bloom > 0 ? bloomFactor : 1)
-            avg.green += other.green * (other.bloom > 0 ? bloomFactor : 1)
-            avg.blue += other.blue * (other.bloom > 0 ? bloomFactor : 1)
-            avg.count += (other.bloom > 0 ? bloomFactor : 1)
-            if (other.bloom - bloomDecayMax > maxNeighborBloom) {
-              maxNeighborBloom = other.bloom
-              newOrigin = other.originColor
-            }
-          }
-          box.red = avg.red / avg.count
-          box.green = avg.green / avg.count
-          box.blue = avg.blue / avg.count
-          if (randInt(0, bloomSpreadOdds) === 0) {
-            box.bloom = Math.max(maxNeighborBloom - randInt(1, bloomDecayMax), 0)
-            if (box.bloom > 0) box.originColor = newOrigin
-          }
         }
-      })
-    })
-    
-    // step: apply drift
-    boxDataStage.forEach(row => {
-      row.forEach(box => {
-        box.red += colorDrift(colorDriftFactor)
-        box.green += colorDrift(colorDriftFactor)
-        box.blue += colorDrift(colorDriftFactor)
-      })
-    })
 
-    // step: enforce bounds on stage before writing to boxData and DOM
-    boxDataStage.forEach(row => {
-      row.forEach(box => enforceColorBoundsOnBox(box))
-    })
+        // step: apply drift
+        for (const { staged } of grid.iterateData()) {
+            staged.driftColors();
+            staged.boundColors();
+        }
 
-    // step: write fussed stage to DOM and boxData
-    boxDataStage.forEach((row, r) => {
-      row.forEach((currentBox, c) => {
-        document.getElementById(currentBox.spanId).style.backgroundColor =
-          `rgb(${currentBox.red}, ${currentBox.green}, ${currentBox.blue})`
-        boxData[r][c].red = currentBox.red
-        boxData[r][c].green = currentBox.green
-        boxData[r][c].blue = currentBox.blue
-        boxData[r][c].bloom = currentBox.bloom
-        boxData[r][c].originColor = currentBox.originColor
-        })
-    })
-  }, frameDelay)
+        // step: write fussed stage to DOM and grid.data
+        for (const { box, staged } of grid.iterateData()) {
+            staged.updateSpanColor();
+            box.clonePropertiesFrom(staged, false);
+        }
+
+        // blur blinks
+        grid.randomlyBlur();
+
+    }, frameDelay)
 }
 
 // returns ref to its interval for cancelation in case of a new loop start
 const colorClouds = (args = {}) => {
-  const bloomDecayMax = args.bloomDecayMax || 5
-  const bloomFactor = args.bloomFactor || 3
-  const bloomInitial = args.bloomInitial || 200
-  const bloomOdds = args.bloomOdds || 100
-  const bloomSpreadOdds = args.bloomSpreadOdds || 20
-  const boxSize = args.boxSize || 20
-  const colorDriftFactor = args.colorDriftFactor || 5
-  const elementId = args.elementId || 'color-clouds'
-  const frameDelay = args.frameDelay || 100
-  DEBUG = args.debug || false
+    const bloomDecayMax = args.bloomDecayMax || 5
+    const bloomFactor = args.bloomFactor || 3
+    const bloomInitial = args.bloomInitial || 200
+    const bloomOdds = args.bloomOdds || 100
+    const bloomSpreadOdds = args.bloomSpreadOdds || 20
+    const boxSize = args.boxSize || 20
+    const colorDriftFactor = args.colorDriftFactor || 5
+    const elementId = args.elementId || 'color-clouds'
+    const frameDelay = args.frameDelay || 100
+    const blur = args.blur || 10;
+    const blurBlinkOdds = args.blurBlinkOdds || 90
+    DEBUG = args.debug || false
 
-  const displayElement = document.getElementById(elementId)
-  if (!displayElement) {
-    return error(`unable to find DOM element with the provided id: ${elementId}`)
-  }
+    const displayElement = document.getElementById(elementId)
+    if (!displayElement) {
+        return error(`unable to find DOM element with the provided id: ${elementId}`)
+    }
 
-  if (window.getComputedStyle(displayElement).position !== 'relative') {
-    displayElement.style.backgroundColor = 'black'
-    displayElement.style.color = 'white'
-    displayElement.innerHTML = 'Sorry, color clouds cannot render in this element!'
-    return error(`this feature only available for use with DOM elements with the 'relative' position style`)
-  }
+    if (window.getComputedStyle(displayElement).position !== 'relative') {
+        displayElement.style.backgroundColor = 'black'
+        displayElement.style.color = 'white'
+        displayElement.innerHTML = 'Sorry, color clouds cannot render in this element!'
+        return error(`this feature only available for use with DOM elements with the 'relative' position style`)
+    }
 
-  // clean target element's content
-  displayElement.innerHTML = ""
+    const grid = new BoxGrid(displayElement, boxSize, {
+        bloomDecayMax,
+        bloomFactor,
+        bloomInitial,
+        bloomOdds,
+        bloomSpreadOdds,
+        colorDriftFactor,
+        blur,
+        blurBlinkOdds
+    });
 
-  const boxData = []
-  const boxDataStage = []
 
-  initBoxes(boxSize, displayElement, boxData, boxDataStage)
-
-  // return ref to the loop interval from setInterval
-  return startLoop(bloomDecayMax, bloomFactor, bloomInitial, bloomOdds, bloomSpreadOdds, boxData, boxDataStage, colorDriftFactor, frameDelay)
+    // return ref to the loop interval from setInterval
+    return startLoop(frameDelay, grid)
 }
